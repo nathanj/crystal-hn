@@ -1,0 +1,13 @@
+name: hn
+version: 0.1.0
+
+authors:
+  - Nathan Jones <nathanj439@gmail.com>
+
+targets:
+  hn:
+    main: src/hn.cr
+
+crystal: 0.24.2
+
+license: MIT
