@@ -12,16 +12,23 @@ class Item
   JSON.mapping(
     id: Int64,
     title: String?,
+    text: String?,
     type: String,
     time: UInt64,
-    score: Int32,
+    score: Int32?,
     kids: Array(Int64)?,
     url: String?,
+    by: String?,
+    deleted: Bool?,
   )
 end
 
 db = DB.open "sqlite3://./db.db"
 db.exec "create table if not exists cache (id integer, data text)"
+
+def wrap(s, width = 78)
+  s.gsub(/(.{1,#{width}})(\s+|\Z)/, "\\1\n")
+end
 
 class HackerNewsApi
   def self.topstories(db, limit : Int32 = 10)
@@ -78,6 +85,27 @@ end
 
 draw w, top, position
 
+def draw_item(w, db, item)
+  if item.kids
+    kids = item.kids.not_nil!.map { |id| HackerNewsApi.get_item db, id }
+    w.clear
+    text = kids[0].text.not_nil!
+    text = text.gsub("&#x27;", "'")
+    paragraphs = text.split("<p>").map { |v| wrap(v) }
+    line_num = 0
+    paragraphs.each do |text|
+      text.split("\n").each do |line|
+        w.set_primary_colors(2, 0)
+        w.write_string(Position.new(0, line_num), "│")
+        w.set_primary_colors(8, 0)
+        w.write_string(Position.new(2, line_num), line)
+        line_num += 1
+      end
+    end
+    w.render
+  end
+end
+
 loop do
   ev = w.poll
   if ev.type == EVENT_KEY
@@ -92,17 +120,20 @@ loop do
     if ev.ch == 'q'.ord
       break
     end
-    if ev.ch == 'j'.ord
+    if ev.ch == 'j'.ord || ev.key == KEY_ARROW_DOWN
       position += 1
       draw w, top, position
     end
-    if ev.ch == 'k'.ord
+    if ev.ch == 'k'.ord || ev.key == KEY_ARROW_UP
       position -= 1
       draw w, top, position
     end
-    if ev.ch == 'l'.ord || ev.key == KEY_ENTER
+    if ev.ch == 'l'.ord || ev.key == KEY_ENTER || ev.key == KEY_ARROW_RIGHT
       viewing_item = top[position]
-      draw_item w, viewing_item
+      draw_item w, db, viewing_item
+    end
+    if ev.ch == 'h'.ord || ev.key == KEY_ARROW_LEFT
+      draw w, top, position
     end
   end
 end
