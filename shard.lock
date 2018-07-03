@@ -1,0 +1,14 @@
+version: 1.0
+shards:
+  db:
+    github: crystal-lang/crystal-db
+    version: 0.5.0
+
+  sqlite3:
+    github: crystal-lang/crystal-sqlite3
+    version: 0.10.0
+
+  termbox:
+    github: andrewsuzuki/termbox-crystal
+    commit: 9471d1f1852dec251d6bcb6f8a583e7abdf04f68
+
