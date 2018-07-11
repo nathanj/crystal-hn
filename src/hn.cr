@@ -4,6 +4,17 @@ require "termbox"
 
 include Termbox
 
+f = File.open("spec/data/17506753.html")
+x = XML.parse(f)
+f.close
+
+xx = x.xpath("//span[@class='c00']").as(XML::NodeSet)
+xx.each do |v|
+  puts v
+end
+
+exit
+
 w = Window.new
 w.set_output_mode(OUTPUT_256)
 w.set_primary_colors(9, 0)
@@ -15,7 +26,7 @@ w.render
 position = 0
 viewing_item = 0
 
-hn = HackerNews::Parser.new "index.html"
+hn = HackerNews::Parser.new "spec/data/index.html"
 stories = hn.top_stories
 stories.sort! { |a, b| b.points <=> a.points }
 
