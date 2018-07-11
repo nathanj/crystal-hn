@@ -1,13 +1,18 @@
 require "xml"
-require "colorize"
 
 module HackerNews
   record Story,
+    id : Int32,
     title : String,
     link : String,
     url : String,
     comments : Int32,
-    points : Int32
+    points : Int32,
+    viewed : Bool do
+    def open_in_browser
+      `$BROWSER "#{link}"`
+    end
+  end
 
   class Parser
     def initialize(filename : String)
@@ -30,22 +35,17 @@ module HackerNews
 
         vv = v.xpath("../../following-sibling::*[1]//a").as(XML::NodeSet)[-1]
         url = "https://news.ycombinator.com/" + vv["href"]
+        vv["href"] =~ /id=(\d+)/
+        id = $~[1].to_i
         if /(\d+)comment/ =~ vv.content
           comments = $~[1].to_i
         else
           comments = 0
         end
 
-        stories << Story.new v.content, v["href"], url, comments, points
+        stories << Story.new id, v.content, v["href"], url, comments, points, false
       end
       stories
     end
   end
-end
-
-hn = HackerNews::Parser.new "index.html"
-stories = hn.top_stories
-stories.sort! { |a, b| b.points <=> a.points }
-stories.each do |v|
-  puts "#{sprintf("%4d ↑", v.points).colorize.green} #{sprintf("%4d", v.comments).colorize.yellow} #{v.title}"
 end
