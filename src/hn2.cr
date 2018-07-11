@@ -78,7 +78,8 @@ windows = [TopStoriesWindow.new(db, ch)] of UiWindow
 spawn do
   loop do
     windows[-1].draw(w)
-    ev = w.poll
+    Fiber.yield
+    ev = w.peek(200)
     if windows[-1].handle_event(ev, windows) == false
       windows.pop
     end

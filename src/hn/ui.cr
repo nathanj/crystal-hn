@@ -36,45 +36,39 @@ module HackerNews
 
   class CommentsWindow < UiWindow
     def initialize(@db : DB::Database, @item : Item, @ch : Channel(Nil))
-      @channel = Channel(Item).new
+      @channel = Channel(Item | Nil).new
       @num_fetching = 0
       @need_redraw = false
       @comments = [] of Item
-      f = File.open "whee22", "w"
-      f.puts("starting thing")
       if @item.kids
         @item.kids.not_nil!.each do |id|
-          f.puts("spawning thread for sending #{id}")
           @num_fetching += 1
           spawn do
-            nil.not_nil!
-            f.puts("fetching #{id}")
-            f.flush
-            item = HackerNews::Api.get_item(@db, id)
-            f.puts("fetched #{id}")
-            f.flush
-            @channel.send(item)
+            begin
+              item = HackerNews::Api.get_item(db, id)
+              @channel.send(item)
+            rescue
+              @channel.send(nil)
+            end
           end
         end
       end
 
-      f.puts("spawning thread for receving")
-      f.flush
       spawn do
         while @num_fetching > 0
-          @comments << @channel.receive
-          f.puts("received #{@comments[-1].id}")
-          f.flush
-          @need_redraw = true
+          comment = @channel.receive
           @num_fetching -= 1
-          @ch.send(nil)
+          if comment
+            @comments << comment
+            @need_redraw = true
+            @ch.send(nil)
+          end
         end
       end
     end
 
     def draw(w)
       w.clear
-      w.write_string(Position.new(0, 0), "comments here")
       line_num = 0
       @comments.each do |comment|
         text = comment.text || ""
@@ -119,12 +113,8 @@ module HackerNews
 
     def initialize(@db : DB::Database, @ch : Channel(Nil))
       @position = 0
-      @f = File.open "log33", "w"
-      @f.puts("starting thing")
       @stories = HackerNews::Api.topstories(@db, 30).map { |id| HackerNews::Api.get_item(@db, id) }
       @stories.sort! { |a, b| (b.score || 0) <=> (a.score || 0) }
-      @f.puts("got stories")
-      @f.close
     end
 
     def draw(w)
