@@ -6,6 +6,7 @@ module HackerNews
   abstract class UiWindow
     abstract def draw(w)
     abstract def handle_event(ev, windows)
+    abstract def close
   end
 
   def wrap(s, width = 78)
@@ -43,75 +44,90 @@ module HackerNews
   class CommentsWindow < UiWindow
     def initialize(@db : DB::Database, @item : Item, @ch : Channel(Nil))
       channel = Channel(Item | Nil).new
+      @close_channel = Channel(Nil).new(2)
       @num_fetching = 0
       @need_redraw = false
       @comments = [] of Item | FetchingItem
       @fetching = [] of Int64
       @position = 0
 
-      if @item.kids
-        @item.kids.not_nil!.each do |id|
+      @item.kids.try do |kids|
+        kids.each do |id|
           @num_fetching += 1
           @comments << FetchingItem.new(id, 0)
-          # @comments << HackerNews::Api.get_item(db, id)
         end
-        @item.kids.try do |kids|
-          @fetching.concat(kids)
-        end
-        Logger.log("FETCH: " + @fetching.inspect)
-        spawn do
-          loop do
-            Logger.log("FETCH: inside fetching loop... size=#{@fetching.size}")
-            while @fetching.size > 0
-              id = @fetching.shift
-              Logger.log("FETCH: id=#{id}")
-              begin
-                item = HackerNews::Api.get_item(db, id)
-                Logger.log("FETCH: got item #{id}")
-                channel.send(item)
-              rescue ex
-                Logger.log("FETCH: exception #{ex}")
-                channel.send(nil)
-              end
-              Logger.log("FETCH: inside fetching loop... size=#{@fetching.size}")
+        @fetching.concat(kids)
+      end
+      Logger.log("FETCH: " + @fetching.inspect)
+      spawn do
+        loop do
+          Logger.log("FETCH: inside fetching loop... size=#{@fetching.size}")
+          while @fetching.size > 0
+            id = @fetching.shift
+            Logger.log("FETCH: id=#{id}")
+            begin
+              item = HackerNews::Api.get_item(db, id)
+              Logger.log("FETCH: got item #{id}")
+              channel.send(item)
+            rescue ex
+              Logger.log("FETCH: exception #{ex}")
+              channel.send(nil)
             end
-            Logger.log("FETCH: sleep 1")
-            sleep 1
+            Logger.log("FETCH: inside fetching loop... size=#{@fetching.size}")
+          end
+          Logger.log("FETCH: sleep 1")
+          sleep 1
+          Logger.log("FETCH: @close_channel.full? #{@close_channel.full?}")
+          if !@close_channel.empty?
+            Logger.log("FETCH: receiving close_channel")
+            @close_channel.receive
+            Logger.log("FETCH: done receiving close_channel")
+            break
           end
         end
       end
 
       spawn do
-        while @num_fetching > 0
-          comment = channel.receive
-          @num_fetching -= 1
-          if comment
-            Logger.log("RECEIVE: receiver got #{comment.id}")
-            i = @comments.index { |c|
-              if c.is_a? FetchingItem
-                c.id == comment.id
-              else
-                false
-              end
-            }.not_nil!
-            comment.indent = @comments[i].indent
-            @comments[i] = comment
-            comment.kids.try { |kids|
-              kids.each do |v|
-                @comments = @comments.insert(
-                  i + 1,
-                  FetchingItem.new(v, comment.indent + 1))
-                Logger.log("RECEIVE: adding #{v} to @fetching")
-                @num_fetching += 1
-                @fetching << v
-                Logger.log("RECEIVE: " + @fetching.inspect)
-              end
-            }
-            @need_redraw = true
-            @ch.send(nil)
+        loop do
+          select
+          when comment = channel.receive
+            @num_fetching -= 1
+            if comment
+              Logger.log("RECEIVE: receiver got #{comment.id}")
+              i = @comments.index { |c|
+                if c.is_a? FetchingItem
+                  c.id == comment.id
+                else
+                  false
+                end
+              }.not_nil!
+              comment.indent = @comments[i].indent
+              @comments[i] = comment
+              comment.kids.try { |kids|
+                kids.each do |v|
+                  @comments = @comments.insert(
+                    i + 1,
+                    FetchingItem.new(v, comment.indent + 1))
+                  Logger.log("RECEIVE: adding #{v} to @fetching")
+                  @num_fetching += 1
+                  @fetching << v
+                  Logger.log("RECEIVE: " + @fetching.inspect)
+                end
+              }
+              @need_redraw = true
+              @ch.send(nil)
+            end
+          when @close_channel.receive
+            Logger.log("RECEIVE: got @close_channel")
+            break
           end
         end
       end
+    end
+
+    def close
+      @close_channel.send(nil)
+      @close_channel.send(nil)
     end
 
     private def get_reply_color(indent)
@@ -194,6 +210,9 @@ module HackerNews
       @position = 0
       @stories = HackerNews::Api.topstories(@db, 30).map { |id| HackerNews::Api.get_item(@db, id) }
       @stories.sort! { |a, b| (b.score || 0) <=> (a.score || 0) }
+    end
+
+    def close
     end
 
     def draw(w)

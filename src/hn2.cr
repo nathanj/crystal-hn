@@ -33,7 +33,7 @@ spawn do
     Fiber.yield
     ev = w.peek(50)
     if windows[-1].handle_event(ev, windows) == false
-      windows.pop
+      windows.pop.close
     end
     if windows.size == 0
       channel.send(nil)
