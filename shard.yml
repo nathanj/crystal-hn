@@ -7,6 +7,8 @@ authors:
 targets:
   hn:
     main: src/hn.cr
+  hn2:
+    main: src/hn2.cr
 
 dependencies:
   termbox:
