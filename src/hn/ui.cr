@@ -34,32 +34,79 @@ module HackerNews
     end
   end
 
+  record FetchingItem,
+    id : Int64,
+    indent : Int32 = 0
+
+  REPLY_COLORS = [1, 2, 3, 4, 5, 6, 7]
+
   class CommentsWindow < UiWindow
     def initialize(@db : DB::Database, @item : Item, @ch : Channel(Nil))
-      @channel = Channel(Item | Nil).new
+      channel = Channel(Item | Nil).new
       @num_fetching = 0
       @need_redraw = false
-      @comments = [] of Item
+      @comments = [] of Item | FetchingItem
+      @fetching = [] of Int64
+      @position = 0
+
       if @item.kids
         @item.kids.not_nil!.each do |id|
           @num_fetching += 1
-          spawn do
-            begin
-              item = HackerNews::Api.get_item(db, id)
-              @channel.send(item)
-            rescue
-              @channel.send(nil)
+          @comments << FetchingItem.new(id, 0)
+          # @comments << HackerNews::Api.get_item(db, id)
+        end
+        @item.kids.try do |kids|
+          @fetching.concat(kids)
+        end
+        Logger.log("FETCH: " + @fetching.inspect)
+        spawn do
+          loop do
+            Logger.log("FETCH: inside fetching loop... size=#{@fetching.size}")
+            while @fetching.size > 0
+              id = @fetching.shift
+              Logger.log("FETCH: id=#{id}")
+              begin
+                item = HackerNews::Api.get_item(db, id)
+                Logger.log("FETCH: got item #{id}")
+                channel.send(item)
+              rescue ex
+                Logger.log("FETCH: exception #{ex}")
+                channel.send(nil)
+              end
+              Logger.log("FETCH: inside fetching loop... size=#{@fetching.size}")
             end
+            Logger.log("FETCH: sleep 1")
+            sleep 1
           end
         end
       end
 
       spawn do
         while @num_fetching > 0
-          comment = @channel.receive
+          comment = channel.receive
           @num_fetching -= 1
           if comment
-            @comments << comment
+            Logger.log("RECEIVE: receiver got #{comment.id}")
+            i = @comments.index { |c|
+              if c.is_a? FetchingItem
+                c.id == comment.id
+              else
+                false
+              end
+            }.not_nil!
+            comment.indent = @comments[i].indent
+            @comments[i] = comment
+            comment.kids.try { |kids|
+              kids.each do |v|
+                @comments = @comments.insert(
+                  i + 1,
+                  FetchingItem.new(v, comment.indent + 1))
+                Logger.log("RECEIVE: adding #{v} to @fetching")
+                @num_fetching += 1
+                @fetching << v
+                Logger.log("RECEIVE: " + @fetching.inspect)
+              end
+            }
             @need_redraw = true
             @ch.send(nil)
           end
@@ -67,42 +114,74 @@ module HackerNews
       end
     end
 
+    private def get_reply_color(indent)
+      REPLY_COLORS[indent % REPLY_COLORS.size]
+    end
+
     def draw(w)
+      top = @position
+      bottom = @position + w.height
       w.clear
       line_num = 0
       @comments.each do |comment|
-        text = comment.text || ""
-        text = text.gsub("&#x27;", "'")
-        text = text.gsub("&#x2F;", "/")
-        text = text.gsub("&quot;", "\"")
-        text = text.gsub("&gt;", ">")
-        text = text.gsub("&lt;", "<")
-        paragraphs = text.split("<p>").map { |v| wrap(v) }
-        paragraphs.each do |text|
-          text.split("\n").each do |line|
-            w.set_primary_colors(2, 0)
-            w.write_string(Position.new(0, line_num), "│")
-            w.set_primary_colors(7, 0)
-            if line.starts_with? ">"
-              w.set_primary_colors(9, 0)
+        case comment
+        when Item
+          text = comment.text || ""
+          text = text.gsub("&#x27;", "'")
+          text = text.gsub("&#x2F;", "/")
+          text = text.gsub("&quot;", "\"")
+          text = text.gsub("&gt;", ">")
+          text = text.gsub("&lt;", "<")
+          text = text.gsub("&amp;", "&")
+          paragraphs = text.split("<p>").map { |v| wrap(v, width: 78 - comment.indent) }
+          paragraphs.each do |text|
+            text.split("\n").each do |line|
+              if line_num >= top && line_num <= bottom
+                w.set_primary_colors(get_reply_color(comment.indent), 0)
+                w.write_string(Position.new(comment.indent, line_num - @position), "│")
+                w.set_primary_colors(7, 0)
+                if line.starts_with? ">"
+                  w.set_primary_colors(9, 0)
+                end
+                w.write_string(Position.new(comment.indent + 2, line_num - @position), line)
+              end
+              line_num += 1
             end
-            w.write_string(Position.new(2, line_num), line)
-            line_num += 1
           end
+          if line_num >= top && line_num <= bottom
+            t = Time.epoch(comment.time)
+            w.set_primary_colors(3, 0)
+            w.write_string(Position.new(comment.indent + 1, line_num - 1 - @position), " - #{comment.by} @ #{to_pretty(t)}")
+          end
+          line_num += 1
+        when FetchingItem
+          if line_num >= top && line_num <= bottom
+            w.write_string(Position.new(comment.indent, line_num - @position), "│Loading...")
+          end
+          line_num += 1
         end
-        t = Time.epoch(comment.time)
-        w.set_primary_colors(3, 0)
-        w.write_string(Position.new(1, line_num - 1), " - #{comment.by} @ #{to_pretty(t)}")
-        line_num += 1
       end
       w.render
     end
 
     def handle_event(ev, windows)
       if ev.type == EVENT_KEY
-        if ev.key == KEY_ESC || ev.ch == 'q'.ord || ev.ch == 'h'.ord
+        if ev.key == KEY_ESC || ev.ch == 'q'.ord || ev.ch == 'h'.ord || ev.key == KEY_ARROW_LEFT
           return false
         end
+        if ev.key == KEY_ARROW_DOWN || ev.ch == 'j'.ord
+          @position += 1
+        end
+        if ev.key == KEY_ARROW_UP || ev.ch == 'k'.ord
+          @position -= 1
+        end
+        if ev.key == KEY_PGDN
+          @position += 20
+        end
+        if ev.key == KEY_PGUP
+          @position -= 20
+        end
+        @position = 0 if @position < 0
       end
       return true
     end
