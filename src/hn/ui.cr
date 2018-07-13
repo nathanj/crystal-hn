@@ -6,7 +6,7 @@ include Termbox
 module HackerNews
   abstract class UiWindow
     abstract def draw(w)
-    abstract def handle_event(ev, windows)
+    abstract def handle_event(ev, w, windows)
     abstract def close
   end
 
@@ -38,44 +38,12 @@ module HackerNews
 
   REPLY_COLORS = [2, 3, 4, 5, 6]
 
-  record Comment,
-    text : String,
-    indent : Int32
-
   class CommentsWindow < UiWindow
-    def initialize(@db : DB::Database, @item : Item, @ch : Channel(Nil))
+    @comments = [] of Comment
+
+    def initialize(@db : DB::Database, @item : Story, @ch : Channel(Nil))
       @position = 0
-      @comments = [] of Comment
-
-      html = HTTP::Client.get("https://news.ycombinator.com/item?id=#{@item.id}").body
-      x = XML.parse(html)
-      # f = File.open("spec/data/17517285.html")
-      # x = XML.parse(f)
-      # f.close
-
-      ind = x.xpath_nodes("//td[@class='ind']")
-      xx = x.xpath_nodes("//span[@class='c00']")
-      indents = ind.map { |v| v.xpath_node("img").not_nil!["width"].to_i / 40 }
-      comment_stack = [] of Comment
-      comments = [] of Comment
-      xx.to_a.zip(indents) do |node, indent|
-        # puts "content = \n".colorize.yellow.to_s + node.parent.not_nil!.parent.to_s + "\n\n"
-        asdf = node.to_s.gsub(/<span>.*/m, "")
-          .gsub(/<a href="([^"]+)" rel="nofollow">[^<]+<\/a>/, "\\1")
-          .gsub("<span class=\"c00\">", "")
-          .gsub("&#x27;", "'")
-          .gsub("&#x2F;", "/")
-          .gsub("&quot;", "\"")
-          .gsub("&gt;", ">")
-          .gsub("&lt;", "<")
-          .gsub("&amp;", "&")
-          .gsub("&#x2019;", "'")
-          .gsub("&#x201C;", "\"")
-          .gsub("&#x201D;", "\"")
-        # puts "asdf = ".colorize.green.to_s + wrap(asdf.to_s, width: 120)
-        # puts "indent = ".colorize.blue.to_s + indent.to_s
-        @comments << Comment.new(asdf, indent)
-      end
+      @comments = Parser.comments(@item.id)
     end
 
     def close
@@ -117,7 +85,7 @@ module HackerNews
       w.render
     end
 
-    def handle_event(ev, windows)
+    def handle_event(ev, w, windows)
       if ev.type == EVENT_KEY
         if ev.key == KEY_ESC || ev.ch == 'q'.ord || ev.ch == 'h'.ord || ev.key == KEY_ARROW_LEFT
           return false
@@ -129,10 +97,10 @@ module HackerNews
           @position -= 1
         end
         if ev.key == KEY_PGDN
-          @position += 20
+          @position += w.height
         end
         if ev.key == KEY_PGUP
-          @position -= 20
+          @position -= w.height
         end
         @position = 0 if @position < 0
       end
@@ -141,12 +109,12 @@ module HackerNews
   end
 
   class TopStoriesWindow < UiWindow
-    @stories : Array(Item)
+    @stories : Array(Story)
 
     def initialize(@db : DB::Database, @ch : Channel(Nil))
       @position = 0
-      @stories = HackerNews::Api.topstories(@db, 30).map { |id| HackerNews::Api.get_item(@db, id) }
-      @stories.sort! { |a, b| (b.score || 0) <=> (a.score || 0) }
+      @stories = Parser.top_stories
+      @stories.sort! { |a, b| (b.points || 0) <=> (a.points || 0) }
     end
 
     def close
@@ -164,9 +132,9 @@ module HackerNews
           w.write_string(Position.new(1, i), ">")
         end
         w.set_primary_colors(10 | attrs, 0)
-        w.write_string(Position.new(3, i), sprintf("[%4d]", item.score))
+        w.write_string(Position.new(3, i), sprintf("[%4d]", item.points))
         w.set_primary_colors(11 | attrs, 0)
-        w.write_string(Position.new(9, i), sprintf("[%4d]", item.descendants || 0))
+        w.write_string(Position.new(9, i), sprintf("[%4d]", item.comments))
         w.set_primary_colors((item.viewed ? 1 : 9) | attrs, 0)
         w.write_string(Position.new(16, i), item.title || "No title")
         w.set_primary_colors(9, 0)
@@ -176,7 +144,7 @@ module HackerNews
       w.render
     end
 
-    def handle_event(ev, windows)
+    def handle_event(ev, w, windows)
       if ev.type == EVENT_KEY
         if [KEY_ESC, KEY_CTRL_C, KEY_CTRL_D].includes? ev.key
           return false
@@ -196,7 +164,7 @@ module HackerNews
         if ev.ch == 'l'.ord || ev.key == KEY_ENTER || ev.key == KEY_ARROW_RIGHT
           viewing_item = @stories[@position]
           viewing_item.viewed = true
-          HackerNews::Api.mark_viewed(@db, viewing_item.id)
+          # HackerNews::Api.mark_viewed(@db, viewing_item.id)
           windows << CommentsWindow.new(@db, viewing_item, @ch)
         end
       end

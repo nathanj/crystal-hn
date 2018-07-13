@@ -32,7 +32,7 @@ spawn do
     windows[-1].draw(w)
     # Fiber.yield
     ev = w.poll
-    if windows[-1].handle_event(ev, windows) == false
+    if windows[-1].handle_event(ev, w, windows) == false
       windows.pop.close
     end
     if windows.size == 0
