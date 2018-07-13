@@ -1,17 +1,54 @@
 require "./hn/*"
 
 require "termbox"
+require "colorize"
 
 include Termbox
 
-f = File.open("spec/data/17506753.html")
+def wrap(s, width = 78)
+  if s.starts_with? '>'
+    s.gsub(/(.{1,#{width}})(\s+|\Z)/, "\\1\n> ")
+  else
+    s.gsub(/(.{1,#{width}})(\s+|\Z)/, "\\1\n")
+  end
+end
+
+# f = File.open("spec/data/17506753.html")
+f = File.open("spec/data/17517285.html")
 x = XML.parse(f)
 f.close
 
-xx = x.xpath("//span[@class='c00']").as(XML::NodeSet)
-xx.each do |v|
-  puts v
+record Comment,
+  text : String,
+  kids : Array(Comment)
+
+ind = x.xpath_nodes("//td[@class='ind']")
+xx = x.xpath_nodes("//span[@class='c00']")
+indents = ind.map { |v| v.xpath_node("img").not_nil!["width"].to_i / 40 }
+comment_stack = [] of Comment
+comments = [] of Comment
+xx.to_a.zip(indents) do |x, y|
+  # puts "content = \n".colorize.yellow.to_s + x.parent.not_nil!.parent.to_s + "\n\n"
+  asdf = x.to_s.gsub(/<span>.*/m, "").gsub(/<p>/, "\n")
+  puts "asdf = ".colorize.green.to_s + wrap(asdf.to_s, width: 120)
+  puts "indent = ".colorize.blue.to_s + y.to_s
+  c = Comment.new asdf, Array(Comment).new
+  if y == 0
+    comments << c
+  else
+    comments[-1].kids << c
+  end
 end
+
+def print_comments(comments, indent = 0)
+  comments.each do |v|
+    indent.times { |i| print " " }
+    puts v.text
+    print_comments(v.kids, indent + 2)
+  end
+end
+
+print_comments(comments)
 
 exit
 
