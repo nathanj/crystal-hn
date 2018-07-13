@@ -36,7 +36,7 @@ module HackerNews
     end
   end
 
-  REPLY_COLORS = [1, 2, 3, 4, 5, 6, 7]
+  REPLY_COLORS = [2, 3, 4, 5, 6]
 
   record Comment,
     text : String,
