@@ -47,9 +47,11 @@ module HackerNews
       @position = 0
       @comments = [] of Comment
 
-      f = File.open("spec/data/17517285.html")
-      x = XML.parse(f)
-      f.close
+      html = HTTP::Client.get("https://news.ycombinator.com/item?id=#{@item.id}").body
+      x = XML.parse(html)
+      # f = File.open("spec/data/17517285.html")
+      # x = XML.parse(f)
+      # f.close
 
       ind = x.xpath_nodes("//td[@class='ind']")
       xx = x.xpath_nodes("//span[@class='c00']")
@@ -59,12 +61,17 @@ module HackerNews
       xx.to_a.zip(indents) do |node, indent|
         # puts "content = \n".colorize.yellow.to_s + node.parent.not_nil!.parent.to_s + "\n\n"
         asdf = node.to_s.gsub(/<span>.*/m, "")
+          .gsub(/<a href="([^"]+)" rel="nofollow">[^<]+<\/a>/, "\\1")
+          .gsub("<span class=\"c00\">", "")
           .gsub("&#x27;", "'")
           .gsub("&#x2F;", "/")
           .gsub("&quot;", "\"")
           .gsub("&gt;", ">")
           .gsub("&lt;", "<")
           .gsub("&amp;", "&")
+          .gsub("&#x2019;", "'")
+          .gsub("&#x201C;", "\"")
+          .gsub("&#x201D;", "\"")
         # puts "asdf = ".colorize.green.to_s + wrap(asdf.to_s, width: 120)
         # puts "indent = ".colorize.blue.to_s + indent.to_s
         @comments << Comment.new(asdf, indent)
