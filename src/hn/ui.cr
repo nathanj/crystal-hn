@@ -1,4 +1,5 @@
 require "termbox"
+require "xml"
 
 include Termbox
 
@@ -35,99 +36,42 @@ module HackerNews
     end
   end
 
-  record FetchingItem,
-    id : Int64,
-    indent : Int32 = 0
-
   REPLY_COLORS = [1, 2, 3, 4, 5, 6, 7]
+
+  record Comment,
+    text : String,
+    indent : Int32
 
   class CommentsWindow < UiWindow
     def initialize(@db : DB::Database, @item : Item, @ch : Channel(Nil))
-      channel = Channel(Item | Nil).new
-      @close_channel = Channel(Nil).new(2)
-      @num_fetching = 0
-      @need_redraw = false
-      @comments = [] of Item | FetchingItem
-      @fetching = [] of Int64
       @position = 0
+      @comments = [] of Comment
 
-      @item.kids.try do |kids|
-        kids.each do |id|
-          @num_fetching += 1
-          @comments << FetchingItem.new(id, 0)
-        end
-        @fetching.concat(kids)
-      end
-      Logger.log("FETCH: " + @fetching.inspect)
-      spawn do
-        loop do
-          Logger.log("FETCH: inside fetching loop... size=#{@fetching.size}")
-          while @fetching.size > 0
-            id = @fetching.shift
-            Logger.log("FETCH: id=#{id}")
-            begin
-              item = HackerNews::Api.get_item(db, id)
-              Logger.log("FETCH: got item #{id}")
-              channel.send(item)
-            rescue ex
-              Logger.log("FETCH: exception #{ex}")
-              channel.send(nil)
-            end
-            Logger.log("FETCH: inside fetching loop... size=#{@fetching.size}")
-          end
-          Logger.log("FETCH: sleep 1")
-          sleep 1
-          Logger.log("FETCH: @close_channel.full? #{@close_channel.full?}")
-          if !@close_channel.empty?
-            Logger.log("FETCH: receiving close_channel")
-            @close_channel.receive
-            Logger.log("FETCH: done receiving close_channel")
-            break
-          end
-        end
-      end
+      f = File.open("spec/data/17517285.html")
+      x = XML.parse(f)
+      f.close
 
-      spawn do
-        loop do
-          select
-          when comment = channel.receive
-            @num_fetching -= 1
-            if comment
-              Logger.log("RECEIVE: receiver got #{comment.id}")
-              i = @comments.index { |c|
-                if c.is_a? FetchingItem
-                  c.id == comment.id
-                else
-                  false
-                end
-              }.not_nil!
-              comment.indent = @comments[i].indent
-              @comments[i] = comment
-              comment.kids.try { |kids|
-                kids.each do |v|
-                  @comments = @comments.insert(
-                    i + 1,
-                    FetchingItem.new(v, comment.indent + 1))
-                  Logger.log("RECEIVE: adding #{v} to @fetching")
-                  @num_fetching += 1
-                  @fetching << v
-                  Logger.log("RECEIVE: " + @fetching.inspect)
-                end
-              }
-              @need_redraw = true
-              @ch.send(nil)
-            end
-          when @close_channel.receive
-            Logger.log("RECEIVE: got @close_channel")
-            break
-          end
-        end
+      ind = x.xpath_nodes("//td[@class='ind']")
+      xx = x.xpath_nodes("//span[@class='c00']")
+      indents = ind.map { |v| v.xpath_node("img").not_nil!["width"].to_i / 40 }
+      comment_stack = [] of Comment
+      comments = [] of Comment
+      xx.to_a.zip(indents) do |node, indent|
+        # puts "content = \n".colorize.yellow.to_s + node.parent.not_nil!.parent.to_s + "\n\n"
+        asdf = node.to_s.gsub(/<span>.*/m, "")
+          .gsub("&#x27;", "'")
+          .gsub("&#x2F;", "/")
+          .gsub("&quot;", "\"")
+          .gsub("&gt;", ">")
+          .gsub("&lt;", "<")
+          .gsub("&amp;", "&")
+        # puts "asdf = ".colorize.green.to_s + wrap(asdf.to_s, width: 120)
+        # puts "indent = ".colorize.blue.to_s + indent.to_s
+        @comments << Comment.new(asdf, indent)
       end
     end
 
     def close
-      @close_channel.send(nil)
-      @close_channel.send(nil)
     end
 
     private def get_reply_color(indent)
@@ -140,42 +84,28 @@ module HackerNews
       w.clear
       line_num = 0
       @comments.each do |comment|
-        case comment
-        when Item
-          text = comment.text || ""
-          text = text.gsub("&#x27;", "'")
-          text = text.gsub("&#x2F;", "/")
-          text = text.gsub("&quot;", "\"")
-          text = text.gsub("&gt;", ">")
-          text = text.gsub("&lt;", "<")
-          text = text.gsub("&amp;", "&")
-          paragraphs = text.split("<p>").map { |v| wrap(v, width: 78 - comment.indent) }
-          paragraphs.each do |text|
-            text.split("\n").each do |line|
-              if line_num >= top && line_num <= bottom
-                w.set_primary_colors(get_reply_color(comment.indent), 0)
-                w.write_string(Position.new(comment.indent, line_num - @position), "│")
-                w.set_primary_colors(7, 0)
-                if line.starts_with? ">"
-                  w.set_primary_colors(9, 0)
-                end
-                w.write_string(Position.new(comment.indent + 2, line_num - @position), line)
+        text = comment.text
+        paragraphs = text.split("<p>").map { |v| wrap(v, width: 78 - comment.indent) }
+        paragraphs.each do |text|
+          text.split("\n").each do |line|
+            if line_num >= top && line_num <= bottom
+              w.set_primary_colors(get_reply_color(comment.indent), 0)
+              w.write_string(Position.new(comment.indent, line_num - @position), "│")
+              w.set_primary_colors(7, 0)
+              if line.starts_with? ">"
+                w.set_primary_colors(9, 0)
               end
-              line_num += 1
+              w.write_string(Position.new(comment.indent + 2, line_num - @position), line)
             end
+            line_num += 1
           end
-          if line_num >= top && line_num <= bottom
-            t = Time.epoch(comment.time)
-            w.set_primary_colors(3, 0)
-            w.write_string(Position.new(comment.indent + 1, line_num - 1 - @position), " - #{comment.by} @ #{to_pretty(t)}")
-          end
-          line_num += 1
-        when FetchingItem
-          if line_num >= top && line_num <= bottom
-            w.write_string(Position.new(comment.indent, line_num - @position), "│Loading...")
-          end
-          line_num += 1
         end
+        if line_num >= top && line_num <= bottom
+          # t = Time.epoch(comment.time)
+          w.set_primary_colors(3, 0)
+          w.write_string(Position.new(comment.indent + 1, line_num - 1 - @position), " - by @ time")
+        end
+        line_num += 1
       end
       w.render
     end
