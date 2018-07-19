@@ -53,7 +53,9 @@ module HackerNews
     end
 
     private def self.open_db
-      db = DB.open "sqlite3://./db.db"
+      path = ENV["XDG_CACHE_HOME"]? || "#{ENV["HOME"]}/.cache/hn"
+      Dir.mkdir_p(path, 0o755)
+      db = DB.open "sqlite3://#{path}/db"
       db.exec "create table if not exists viewed (id integer unique)"
       db
     end
