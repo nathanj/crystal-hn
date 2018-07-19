@@ -78,7 +78,7 @@ module HackerNews
         if line_num >= top && line_num <= bottom
           # t = Time.epoch(comment.time)
           w.set_primary_colors(3, 0)
-          w.write_string(Position.new(comment.indent + 1, line_num - 1 - @position), " - by @ time")
+          w.write_string(Position.new(comment.indent + 1, line_num - 1 - @position), " - by #{comment.author} @ #{comment.time}")
         end
         line_num += 1
       end
@@ -115,6 +115,7 @@ module HackerNews
       @position = 0
       @stories = Parser.top_stories
       @stories.sort! { |a, b| (b.points || 0) <=> (a.points || 0) }
+      Parser.get_viewed_status(@stories)
     end
 
     def close
@@ -164,7 +165,7 @@ module HackerNews
         if ev.ch == 'l'.ord || ev.key == KEY_ENTER || ev.key == KEY_ARROW_RIGHT
           viewing_item = @stories[@position]
           viewing_item.viewed = true
-          # HackerNews::Api.mark_viewed(@db, viewing_item.id)
+          Parser.mark_viewed(viewing_item.id)
           windows << CommentsWindow.new(@db, viewing_item, @ch)
         end
       end

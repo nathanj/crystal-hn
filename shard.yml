@@ -5,8 +5,6 @@ authors:
   - Nathan Jones <nathanj439@gmail.com>
 
 targets:
-  hn:
-    main: src/hn.cr
   hn2:
     main: src/hn2.cr
 

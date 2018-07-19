@@ -1,31 +1,31 @@
 require "xml"
 
 module HackerNews
-  record Story,
-    id : Int32,
-    title : String,
-    link : String,
-    url : String,
-    comments : Int32,
-    points : Int32,
-    viewed : Bool do
-    def open_in_browser
-      `$BROWSER "#{link}"`
+  class Story
+    property id : Int32
+    property title : String
+    property link : String
+    property url : String
+    property comments : Int32
+    property points : Int32
+    property viewed : Bool
+
+    def initialize(@id, @title, @link, @url, @comments, @points, @viewed)
     end
 
-    def viewed=(v)
-      viewed = v
+    def open_in_browser
+      `$BROWSER "#{link}"`
     end
   end
 
   record Comment,
     text : String,
+    author : String,
+    time : String,
     indent : Int32
 
   class Parser
-    def self.top_stories
-      xml = XML.parse(HTTP::Client.get("https://news.ycombinator.com/").body)
-
+    private def self.parse_top_stories(xml)
       stories = [] of Story
       links = xml.xpath("//a[@class='storylink']").as(XML::NodeSet)
       links.each do |v|
@@ -52,8 +52,40 @@ module HackerNews
       stories
     end
 
-    def self.comments(id : Int32)
-      xml = XML.parse(HTTP::Client.get("https://news.ycombinator.com/item?id=#{id}").body)
+    private def self.open_db
+      db = DB.open "sqlite3://./db.db"
+      db.exec "create table if not exists viewed (id integer)"
+      db
+    end
+
+    def self.get_viewed_status(stories)
+      db = open_db
+      stories.each do |v|
+        data = db.query_one? "select id from viewed where id = ?", v.id, as: Int32
+        v.viewed = true if data
+      end
+      db.close
+    end
+
+    def self.mark_viewed(id)
+      db = open_db
+      db.exec "insert into viewed values (?)", id
+      db.close
+    end
+
+    def self.top_stories_fn(fn)
+      f = File.open(fn)
+      xml = XML.parse(f)
+      f.close
+      parse_top_stories(xml)
+    end
+
+    def self.top_stories
+      xml = XML.parse(HTTP::Client.get("https://news.ycombinator.com/").body)
+      parse_top_stories(xml)
+    end
+
+    private def self.parse_comments(xml)
       comments = [] of Comment
 
       ind = xml.xpath_nodes("//td[@class='ind']")
@@ -63,7 +95,10 @@ module HackerNews
       comments = [] of Comment
       xx.to_a.zip(indents) do |node, indent|
         # puts "content = \n".colorize.yellow.to_s + node.parent.not_nil!.parent.to_s + "\n\n"
-        asdf = node.to_s.gsub(/<span>.*/m, "")
+        author = node.xpath_node("../../..//a[@class='hnuser']").try(&.content) || ""
+        time = node.xpath_node("../../..//span[@class='age']/a").try(&.content) || ""
+        asdf = node.to_s
+          .gsub(/<span>.*/m, "")
           .gsub(/<a href="([^"]+)" rel="nofollow">[^<]+<\/a>/, "\\1")
           .gsub("<span class=\"c00\">", "")
           .gsub("&#x27;", "'")
@@ -77,9 +112,21 @@ module HackerNews
           .gsub("&#x201D;", "\"")
         # puts "asdf = ".colorize.green.to_s + wrap(asdf.to_s, width: 120)
         # puts "indent = ".colorize.blue.to_s + indent.to_s
-        comments << Comment.new(asdf, indent)
+        comments << Comment.new(asdf, author, time, indent)
       end
       comments
+    end
+
+    def self.comments_fn(fn)
+      f = File.open(fn)
+      xml = XML.parse(f)
+      f.close
+      parse_comments(xml)
+    end
+
+    def self.comments(id : Int32)
+      xml = XML.parse(HTTP::Client.get("https://news.ycombinator.com/item?id=#{id}").body)
+      parse_comments(xml)
     end
   end
 end

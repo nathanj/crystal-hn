@@ -15,5 +15,9 @@ module HackerNews
         f.flush
       end
     end
+
+    def self.inspect(obj)
+      log(obj.pretty_inspect)
+    end
   end
 end
