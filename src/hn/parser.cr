@@ -54,7 +54,7 @@ module HackerNews
 
     private def self.open_db
       db = DB.open "sqlite3://./db.db"
-      db.exec "create table if not exists viewed (id integer)"
+      db.exec "create table if not exists viewed (id integer unique)"
       db
     end
 
@@ -69,7 +69,7 @@ module HackerNews
 
     def self.mark_viewed(id)
       db = open_db
-      db.exec "insert into viewed values (?)", id
+      db.exec "insert or ignore into viewed values (?)", id
       db.close
     end
 

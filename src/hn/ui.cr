@@ -18,24 +18,6 @@ module HackerNews
     end
   end
 
-  def to_pretty(t)
-    a = (Time.now - t).to_i
-
-    case a
-    when               0 then "just now"
-    when               1 then "a second ago"
-    when 2..59           then a.to_s + " seconds ago"
-    when 60..119         then "a minute ago" # 120 = 2 minutes
-    when 120..3540       then (a/60).to_i.to_s + " minutes ago"
-    when 3541..7100      then "an hour ago" # 3600 = 1 hour
-    when 7101..82800     then ((a + 99)/3600).to_i.to_s + " hours ago"
-    when 82801..172000   then "a day ago" # 86400 = 1 day
-    when 172001..518400  then ((a + 800)/(60*60*24)).to_i.to_s + " days ago"
-    when 518400..1036800 then "a week ago"
-    else                      ((a + 180000)/(60*60*24*7)).to_i.to_s + " weeks ago"
-    end
-  end
-
   REPLY_COLORS = [2, 3, 4, 5, 6]
 
   class CommentsWindow < UiWindow
@@ -124,10 +106,7 @@ module HackerNews
     def draw(w)
       w.clear
       @stories.each_with_index do |item, i|
-        # pp item
-        # puts item.title.colorize.blue
-        # `$BROWSER "#{item.url}"`
-        attrs = i == @position ? ATTR_BOLD : 0
+        attrs = i == @position ? ATTR_UNDERLINE : 0
         w.set_primary_colors(9 | attrs, 0)
         if i == @position
           w.write_string(Position.new(1, i), ">")
@@ -136,11 +115,9 @@ module HackerNews
         w.write_string(Position.new(3, i), sprintf("[%4d]", item.points))
         w.set_primary_colors(11 | attrs, 0)
         w.write_string(Position.new(9, i), sprintf("[%4d]", item.comments))
-        w.set_primary_colors((item.viewed ? 1 : 9) | attrs, 0)
+        w.set_primary_colors(((item.viewed && i != @position) ? 241 : 0) | attrs, 0)
         w.write_string(Position.new(16, i), item.title || "No title")
         w.set_primary_colors(9, 0)
-        # w.write_string(Position.new(0, i + 1), "Fetching...")
-        # sleep 0.5
       end
       w.render
     end
