@@ -6,9 +6,6 @@ require "./hn/*"
 include Termbox
 include HackerNews
 
-db = DB.open "sqlite3://./db.db"
-db.exec "create table if not exists cache (id integer, time integer, viewed integer, data text)"
-
 w = Window.new
 w.set_output_mode(OUTPUT_256)
 w.clear
@@ -16,16 +13,10 @@ w.clear
 w.write_string(Position.new(0, 0), "Loading stories...")
 w.render
 
-# pp stories
-
 channel = Channel(Nil).new
 ch = Channel(Nil).new
 
-f = File.open "log22", "w"
-f.puts("starting thing")
-f.close
-
-windows = [TopStoriesWindow.new(db, ch)] of UiWindow
+windows = [TopStoriesWindow.new(ch)] of UiWindow
 
 spawn do
   loop do

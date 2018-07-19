@@ -1,4 +1,6 @@
 module HackerNews
+  # print style debugging does not work well with a TUI app, so log messages to
+  # a file instead
   class Logger
     @@f : File?
 

@@ -23,7 +23,7 @@ module HackerNews
   class CommentsWindow < UiWindow
     @comments = [] of Comment
 
-    def initialize(@db : DB::Database, @item : Story, @ch : Channel(Nil))
+    def initialize(@item : Story, @ch : Channel(Nil))
       @position = 0
       @comments = Parser.comments(@item.id)
     end
@@ -93,7 +93,7 @@ module HackerNews
   class TopStoriesWindow < UiWindow
     @stories : Array(Story)
 
-    def initialize(@db : DB::Database, @ch : Channel(Nil))
+    def initialize(@ch : Channel(Nil))
       @position = 0
       @stories = Parser.top_stories
       @stories.sort! { |a, b| (b.points || 0) <=> (a.points || 0) }
@@ -143,7 +143,7 @@ module HackerNews
           viewing_item = @stories[@position]
           viewing_item.viewed = true
           Parser.mark_viewed(viewing_item.id)
-          windows << CommentsWindow.new(@db, viewing_item, @ch)
+          windows << CommentsWindow.new(viewing_item, @ch)
         end
       end
       return true

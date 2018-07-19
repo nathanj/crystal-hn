@@ -27,9 +27,9 @@ module HackerNews
   class Parser
     private def self.parse_top_stories(xml)
       stories = [] of Story
-      links = xml.xpath("//a[@class='storylink']").as(XML::NodeSet)
+      links = xml.xpath_nodes("//a[@class='storylink']")
       links.each do |v|
-        vv = v.xpath("../../following-sibling::*[1]//span[@class='score']").as(XML::NodeSet)
+        vv = v.xpath_nodes("../../following-sibling::*[1]//span[@class='score']")
         points = 0
         if vv.size > 0
           if /(\d+) points/ =~ vv[0].content
@@ -37,7 +37,7 @@ module HackerNews
           end
         end
 
-        vv = v.xpath("../../following-sibling::*[1]//a").as(XML::NodeSet)[-1]
+        vv = v.xpath_nodes("../../following-sibling::*[1]//a")[-1]
         url = "https://news.ycombinator.com/" + vv["href"]
         vv["href"] =~ /id=(\d+)/
         id = $~[1].to_i
