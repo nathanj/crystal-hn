@@ -81,7 +81,7 @@ module HackerNews
         if ev.key == KEY_PGDN || ev.key == KEY_SPACE
           @position += w.height
         end
-        if ev.key == KEY_PGUP
+        if ev.key == KEY_PGUP || ev.key == KEY_BACKSPACE
           @position -= w.height
         end
         @position = 0 if @position < 0

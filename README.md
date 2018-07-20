@@ -1,27 +1,35 @@
 # hn
 
-TODO: Write a description here
+This is a command line viewer for Hacker News.
+
+todo: asciinema
 
 ## Installation
 
-TODO: Write installation instructions here
+	git clone https://github.com/nathanj/hn
+	shards update
+	shards build
+	./bin/hn
 
 ## Usage
 
-TODO: Write usage instructions here
+### Stories Screen
 
-## Development
+| **Key**               | **Action**                     |
+|-----------------------|--------------------------------|
+| `q`, `Escape`         | Quit                           |
+| `j`, `Down`           | Move Down                      |
+| `k`, `Up`             | Move Up                        |
+| `l`, `Enter`, `Right` | View comments                  |
+| `b`                   | Open story link using $BROWSER |
+| `m`                   | Mark all stories as viewed     |
 
-TODO: Write development instructions here
+### Comments Screen
 
-## Contributing
-
-1. Fork it ( https://github.com/[your-github-name]/hn/fork )
-2. Create your feature branch (git checkout -b my-new-feature)
-3. Commit your changes (git commit -am 'Add some feature')
-4. Push to the branch (git push origin my-new-feature)
-5. Create a new Pull Request
-
-## Contributors
-
-- [[your-github-name]](https://github.com/[your-github-name]) Nathan Jones - creator, maintainer
+| **Key**                    | **Action**      |
+|----------------------------|-----------------|
+| `h`, `q`, `Escape`, `Left` | Back to stories |
+| `j`, `Down`                | Move Down       |
+| `k`, `Up`                  | Move Up         |
+| `Space`, `PageDown`        | Page Down       |
+| `Backspace`, `PageUp`      | Page Up         |
