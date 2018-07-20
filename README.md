@@ -6,10 +6,17 @@ todo: asciinema
 
 ## Installation
 
-	git clone https://github.com/nathanj/hn
-	shards update
-	shards build
-	./bin/hn
+First you must have the termbox library installed. Arch Linux users can install
+from the AUR:
+
+    trizen -S termbox-git
+
+After that you can build and run:
+
+    git clone https://github.com/nathanj/hn
+    shards update
+    shards build
+    ./bin/hn
 
 ## Usage
 

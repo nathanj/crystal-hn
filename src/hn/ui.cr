@@ -115,7 +115,11 @@ module HackerNews
         w.write_string(Position.new(3, i), sprintf("[%4d]", item.points))
         w.set_primary_colors(11 | attrs, 0)
         w.write_string(Position.new(9, i), sprintf("[%4d]", item.comments))
-        w.set_primary_colors(((item.viewed && i != @position) ? 241 : 0) | attrs, 0)
+        if item.viewed
+          w.set_primary_colors((i == @position ? 243 : 241) | attrs, 0)
+        else
+          w.set_primary_colors((i == @position ? 254 : 252) | attrs, 0)
+        end
         w.write_string(Position.new(16, i), item.title || "No title")
         w.set_primary_colors(9, 0)
       end
