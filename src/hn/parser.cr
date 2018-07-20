@@ -14,7 +14,8 @@ module HackerNews
     end
 
     def open_in_browser
-      `$BROWSER "#{link}"`
+      browser = ENV["BROWSER"]? || "firefox"
+      `#{browser} "#{link}"`
     end
   end
 
@@ -69,9 +70,21 @@ module HackerNews
       db.close
     end
 
-    def self.mark_viewed(id)
+    def self.mark_viewed(story)
       db = open_db
-      db.exec "insert or ignore into viewed values (?)", id
+      db.exec "insert or ignore into viewed values (?)", story.id
+      story.viewed = true
+      db.close
+    end
+
+    def self.mark_all_viewed(stories)
+      db = open_db
+      db.exec "begin transaction"
+      stories.each do |v|
+        db.exec "insert or ignore into viewed values (?)", v.id
+        v.viewed = true
+      end
+      db.exec "commit"
       db.close
     end
 

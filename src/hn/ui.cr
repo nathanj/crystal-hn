@@ -78,7 +78,7 @@ module HackerNews
         if ev.key == KEY_ARROW_UP || ev.ch == 'k'.ord
           @position -= 1
         end
-        if ev.key == KEY_PGDN
+        if ev.key == KEY_PGDN || ev.key == KEY_SPACE
           @position += w.height
         end
         if ev.key == KEY_PGUP
@@ -137,13 +137,17 @@ module HackerNews
           @position -= 1
         end
         if ev.ch == 'b'.ord
-          @stories[@position].open_in_browser
+          item = @stories[@position]
+          Parser.mark_viewed(item)
+          item.open_in_browser
         end
         if ev.ch == 'l'.ord || ev.key == KEY_ENTER || ev.key == KEY_ARROW_RIGHT
-          viewing_item = @stories[@position]
-          viewing_item.viewed = true
-          Parser.mark_viewed(viewing_item.id)
-          windows << CommentsWindow.new(viewing_item, @ch)
+          item = @stories[@position]
+          Parser.mark_viewed(item)
+          windows << CommentsWindow.new(item, @ch)
+        end
+        if ev.ch == 'm'.ord
+          Parser.mark_all_viewed(@stories)
         end
       end
       return true
