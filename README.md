@@ -1,4 +1,4 @@
-# hn
+# Hacker News Command Line Client
 
 This is a command line viewer for Hacker News.
 
@@ -14,7 +14,6 @@ from the AUR:
 After that you can build and run:
 
     git clone https://github.com/nathanj/hn
-    shards update
     shards build
     ./bin/hn
 
