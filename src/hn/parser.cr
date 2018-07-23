@@ -2,12 +2,12 @@ require "xml"
 
 module HackerNews
   class Story
-    property id : Int32
-    property title : String
-    property link : String
-    property url : String
-    property comments : Int32
-    property points : Int32
+    getter id : Int32
+    getter title : String
+    getter link : String
+    getter url : String
+    getter comments : Int32
+    getter points : Int32
     property viewed : Bool
 
     def initialize(@id, @title, @link, @url, @comments, @points, @viewed)
