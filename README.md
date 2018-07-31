@@ -13,7 +13,7 @@ from the AUR:
 
 After that you can build and run:
 
-    git clone https://github.com/nathanj/hn
+    git clone https://github.com/nathanj/crystal-hn
     shards build
     ./bin/hn
 
