@@ -29,6 +29,9 @@ After that you can build and run:
 | `l`, `Enter`, `Right` | View comments                  |
 | `b`                   | Open story link using $BROWSER |
 | `m`                   | Mark all stories as viewed     |
+| `1`                   | Switch to top stories          |
+| `2`                   | Switch to ask                  |
+| `3`                   | Switch to show                 |
 
 ### Comments Screen
 

@@ -90,12 +90,11 @@ module HackerNews
     end
   end
 
-  class TopStoriesWindow < UiWindow
+  class StoriesWindow < UiWindow
     @stories : Array(Story)
 
-    def initialize(@ch : Channel(Nil))
+    def initialize(@ch : Channel(Nil), @stories)
       @position = 0
-      @stories = Parser.top_stories
       @stories.sort! { |a, b| (b.points || 0) <=> (a.points || 0) }
       Parser.get_viewed_status(@stories)
     end
@@ -150,11 +149,44 @@ module HackerNews
           Parser.mark_viewed(item)
           windows << CommentsWindow.new(item, @ch)
         end
+        if ev.ch == '1'.ord
+          if (!self.is_a? TopStoriesWindow)
+            windows[-1] = TopStoriesWindow.new(@ch)
+          end
+        end
+        if ev.ch == '2'.ord
+          if (!self.is_a? AskStoriesWindow)
+            windows[-1] = AskStoriesWindow.new(@ch)
+          end
+        end
+        if ev.ch == '3'.ord
+          if (!self.is_a? ShowStoriesWindow)
+            windows[-1] = ShowStoriesWindow.new(@ch)
+          end
+        end
         if ev.ch == 'm'.ord
           Parser.mark_all_viewed(@stories)
         end
       end
       return true
+    end
+  end
+
+  class TopStoriesWindow < StoriesWindow
+    def initialize(@ch : Channel(Nil))
+      super(@ch, Parser.top_stories)
+    end
+  end
+
+  class AskStoriesWindow < StoriesWindow
+    def initialize(@ch : Channel(Nil))
+      super(@ch, Parser.top_ask)
+    end
+  end
+
+  class ShowStoriesWindow < StoriesWindow
+    def initialize(@ch : Channel(Nil))
+      super(@ch, Parser.top_show)
     end
   end
 end

@@ -101,6 +101,16 @@ module HackerNews
       parse_top_stories(xml)
     end
 
+    def self.top_ask
+      xml = XML.parse(HTTP::Client.get("https://news.ycombinator.com/ask").body)
+      parse_top_stories(xml)
+    end
+
+    def self.top_show
+      xml = XML.parse(HTTP::Client.get("https://news.ycombinator.com/show").body)
+      parse_top_stories(xml)
+    end
+
     private def self.parse_comments(xml)
       comments = [] of Comment
 
