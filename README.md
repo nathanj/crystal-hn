@@ -2,7 +2,7 @@
 
 This is a command line viewer for Hacker News.
 
-todo: asciinema
+[![asciicast](https://asciinema.org/a/wkwEDmFQg5tfYnl7cfr5289Fc.png)](https://asciinema.org/a/wkwEDmFQg5tfYnl7cfr5289Fc)
 
 ## Installation
 
