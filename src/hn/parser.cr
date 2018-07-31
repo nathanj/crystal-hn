@@ -1,4 +1,5 @@
 require "xml"
+require "http"
 
 module HackerNews
   class Story
